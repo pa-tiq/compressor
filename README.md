@@ -1,19 +1,24 @@
 ## [github.com/pa-tiq/compressor](https://github.com/pa-tiq/compressor)
 
-Utilitário que comprime vídeos e imagens.
+Utilitário que comprime vídeos, imagens e pdfs.
 Salva o progresso em um log. Então permite cancelar e depois continuar do ponto onde parou.
 `--in-place` substitui o arquivo original pelo arquivo comprimido direto no diretório de origem, _sem backup_. Use com cuidado.
+
+Uso rápido (comprime direto na pasta, substituindo os arquivos originais)
+
+```bash
+python3 compress.py -i /home/usuario/projetos/compressor/Backup
+```
+
+Exemplos:
 
 ```bash
 python3 compress.py origem destino
 
 python3 compress.py --in-place --verbose origem
 
-python3 compress.py -i -v origem
+python3 compress.py /home/usuario/projetos/compressor/Backup /home/usuario/projetos/compressor/Comprimidos
 
-python3 compress.py -i -v /home/usuario/projetos/compressor/Backup
-
-python3 compress.py -i /home/usuario/projetos/compressor/Backup
 ```
 
 ## Requisitos
