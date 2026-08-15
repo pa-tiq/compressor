@@ -136,7 +136,7 @@ O programa lista os arquivos da pasta, baixa cada arquivo temporariamente para o
 Se quiser remover permanentemente as revisões anteriores dos arquivos atualizados, use o seguinte comando:
 
 ```bash
-python3 compress.py --drive --drive-folder-id "1eswIoPOGaEj05Ua_-VaOSh9AivjznK51" --drive-delete-revisions
+python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z" --drive-delete-revisions
 ```
 
 Depois disso, o conteúdo anterior não poderá ser recuperado pelo histórico de versões.

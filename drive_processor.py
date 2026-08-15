@@ -12,6 +12,7 @@ from config import (
     VIDEO_EXTENSIONS,
 )
 from drive_client import GoogleDrive
+from drive_logger import DriveLogger
 
 
 def process_drive(
@@ -21,6 +22,7 @@ def process_drive(
 ):    
     """Processa arquivos do Google Drive."""
     drive = GoogleDrive()
+    logger = DriveLogger()
 
     files = list(
         drive.list_files(folder_id)
@@ -41,11 +43,18 @@ def process_drive(
         elif ext in PDF_EXTENSIONS:
             supported.append(file)
 
+    # Iniciar sessão de logging
+    logger.start_session(folder_id, len(supported))
+    
+    # Filtrar apenas arquivos não processados
+    remaining_files = logger.get_remaining_files(supported)
+    
     print()
     print(f"☁️ Arquivos encontrados: {len(supported)}")
+    print(f"📝 Arquivos para processar: {len(remaining_files)}")
     print()
 
-    for index, file in enumerate(supported, start=1):
+    for index, file in enumerate(remaining_files, start=1):
 
         file_id = file["id"]
         name = file["name"]
@@ -54,9 +63,12 @@ def process_drive(
         ext = Path(name).suffix.lower()
 
         print(
-            f"[{index}/{len(supported)}] "
+            f"[{index}/{len(remaining_files)}] "
             f"📄 {name}"
         )
+
+        # Marcar arquivo como em processamento
+        logger.mark_file_in_progress(file_id, name)
 
         with tempfile.TemporaryDirectory() as temp_dir:
 
@@ -82,6 +94,7 @@ def process_drive(
             except Exception as e:
 
                 print(f"❌ Falha no download: {e}")
+                logger.mark_file_failed(file_id, e)
                 continue
 
             compressed = temp_dir / (
@@ -101,6 +114,7 @@ def process_drive(
                 compressed,
             ):
                 print("❌ Falha na compressão.")
+                logger.mark_file_failed(file_id, "Falha na compressão")
                 continue
 
             compressed_size = compressed.stat().st_size
@@ -121,7 +135,7 @@ def process_drive(
                     "⏭️ Arquivo comprimido não ficou menor. "
                     "Upload ignorado."
                 )
-
+                logger.mark_file_skipped(file_id, "Arquivo não ficou menor após compressão")
                 continue
 
             reduction = (
@@ -155,9 +169,13 @@ def process_drive(
             except Exception as e:
 
                 print(f"❌ Falha no upload: {e}")
+                logger.mark_file_failed(file_id, e)
                 continue
 
             print("✅ Arquivo atualizado.")
+
+            # Marcar arquivo como concluído
+            logger.mark_file_completed(file_id, original_size, compressed_size, reduction)
 
             if delete_revisions:
 
@@ -172,3 +190,6 @@ def process_drive(
                 )
 
         print()
+    
+    # Marcar sessão como concluída
+    logger.complete_session()

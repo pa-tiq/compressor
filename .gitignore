@@ -1,9 +1,12 @@
 fotos/
 backup/
 videos/
-*.json
 .venv/
 tmp/
+.drive_logs/
+# Google Drive credentials (optional - uncomment if you want to exclude them)
+token*.json
+credentials*.json
 
 # Created by https://gitignore.org
 # Python.gitignore
