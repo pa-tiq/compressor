@@ -27,6 +27,7 @@ def process_drive(
     files = list(
         drive.list_files(folder_id)
     )
+    
     supported = []
 
     for file in files:
@@ -49,6 +50,24 @@ def process_drive(
     # Filtrar apenas arquivos não processados
     remaining_files = logger.get_remaining_files(supported)
     
+    # Verificar também appProperties para arquivos que não estão no logger
+    truly_remaining = []
+    app_properties_skipped = 0
+    for file in remaining_files:
+        if not drive.has_app_property(file, "compressor_script"):
+            truly_remaining.append(file)
+        else:
+            # Se tem appProperties mas não está no logger, adicionar ao logger como skip
+            file_id = file["id"]
+            file_name = file["name"]
+            logger.mark_file_skipped(file_id, "Já comprimido pelo script (appProperties)")
+            app_properties_skipped += 1
+    
+    if app_properties_skipped > 0:
+        print(f"📝 {app_properties_skipped} arquivo(s) pulado(s) pelo appProperties do Drive.")
+    
+    remaining_files = truly_remaining
+    
     print()
     print(f"☁️ Arquivos encontrados: {len(supported)}")
     print(f"📝 Arquivos para processar: {len(remaining_files)}")
@@ -61,6 +80,16 @@ def process_drive(
         original_size = int(file.get("size", 0))
 
         ext = Path(name).suffix.lower()
+
+        # Verificar se o arquivo já foi comprimido pelo script usando appProperties
+        if drive.has_app_property(file, "compressor_script"):
+            print(
+                f"[{index}/{len(remaining_files)}] "
+                f"📄 {name}"
+            )
+            print("⏭️ Arquivo já marcado como comprimido pelo script (appProperties). Pulando.")
+            logger.mark_file_skipped(file_id, "Já comprimido pelo script (appProperties)")
+            continue
 
         print(
             f"[{index}/{len(remaining_files)}] "
@@ -136,6 +165,20 @@ def process_drive(
                     "Upload ignorado."
                 )
                 logger.mark_file_skipped(file_id, "Arquivo não ficou menor após compressão")
+                
+                # Marcar arquivo como processado mesmo que não tenha ficado menor
+                try:
+                    drive.set_app_property(file_id, "compressor_script", "1")
+                    print("✅ Arquivo marcado como processado (appProperties).")
+                except Exception as e:
+                    print(f"⚠️ Não foi possível marcar arquivo como processado: {e}")
+                
+                # Deletar revisões antigas mesmo se arquivo não ficou menor
+                if delete_revisions:
+                    print("🗑️ Removendo revisões antigas...")
+                    deleted = drive.delete_old_revisions(file_id)
+                    print(f"✅ {deleted} revisão(ões) removida(s).")
+                
                 continue
 
             reduction = (
@@ -164,6 +207,7 @@ def process_drive(
                     local_path=compressed,
                     name=new_name,
                     mime_type=mime_type,
+                    app_properties={"compressor_script": "1"},
                 )
 
             except Exception as e:

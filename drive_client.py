@@ -73,7 +73,7 @@ class GoogleDrive:
                     supportsAllDrives=True,
                     fields=(
                         "nextPageToken,"
-                        "files(id,name,mimeType,size,resourceKey)"
+                        "files(id,name,mimeType,size,resourceKey,appProperties)"
                     ),
                     pageSize=1000,
                     pageToken=page_token,
@@ -124,6 +124,7 @@ class GoogleDrive:
         local_path,
         name,
         mime_type,
+        app_properties=None,
     ):
         """Atualiza um arquivo no Drive."""
         media = MediaFileUpload(
@@ -135,6 +136,9 @@ class GoogleDrive:
         metadata = {
             "name": name,
         }
+        
+        if app_properties:
+            metadata["appProperties"] = app_properties
 
         return (
             self.service.files()
@@ -147,6 +151,31 @@ class GoogleDrive:
             )
             .execute()
         )
+    
+    def set_app_property(self, file_id, key, value):
+        """Define uma propriedade de aplicação em um arquivo."""
+        # Primeiro obter as propriedades existentes
+        file = self.service.files().get(
+            fileId=file_id,
+            fields="appProperties",
+            supportsAllDrives=True
+        ).execute()
+        
+        existing_properties = file.get("appProperties", {})
+        existing_properties[key] = value
+        
+        # Atualizar apenas as propriedades (sem o conteúdo do arquivo)
+        self.service.files().update(
+            fileId=file_id,
+            body={"appProperties": existing_properties},
+            supportsAllDrives=True,
+            fields="id"
+        ).execute()
+    
+    def has_app_property(self, file, key):
+        """Verifica se um arquivo tem uma propriedade de aplicação específica."""
+        app_properties = file.get("appProperties", {})
+        return key in app_properties
 
     def delete_old_revisions(self, file_id):
         """Remove revisões antigas de um arquivo."""
