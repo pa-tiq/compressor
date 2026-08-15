@@ -21,8 +21,13 @@ IMAGE_EXTENSIONS = {
     ".jpg",
     ".jpeg",
     ".png",
+    ".heic",
+    ".heif",
 }
 
+PDF_EXTENSIONS = {
+    ".pdf",
+}
 
 # --------------------------------------------------------
 # Ctrl+C
@@ -33,17 +38,6 @@ def signal_handler(sig, frame):
 
 
 signal.signal(signal.SIGINT, signal_handler)
-
-
-# --------------------------------------------------------
-# Verifica ffmpeg
-# --------------------------------------------------------
-def check_ffmpeg():
-    if shutil.which("ffmpeg") is None:
-        print("❌ ffmpeg não encontrado.")
-        print("Instale com:")
-        print("sudo apt install ffmpeg")
-        sys.exit(1)
 
 
 # --------------------------------------------------------
@@ -63,11 +57,21 @@ def detect_video_codec():
     print("⚠️ libx265 não encontrado. Usando H.264.")
     return "libx264", "23", "medium"
 
-
+def check_dependencies():
+    dependencies = {
+        "ffmpeg": "sudo apt install ffmpeg",
+        "heif-convert": "sudo apt install libheif-examples",
+        "gs": "sudo apt install ghostscript",
+    }
+    for command, install in dependencies.items():
+        if shutil.which(command) is None:
+            print(f"❌ {command} não encontrado.")
+            print(f"Instale com: {install}")
+            sys.exit(1)
 # --------------------------------------------------------
 # Executa ffmpeg
 # --------------------------------------------------------
-def run_ffmpeg(command, verbose):
+def run_command(command, verbose):
 
     if verbose:
         return subprocess.run(command).returncode == 0
@@ -140,7 +144,11 @@ class Compressor:
 
             ext = arquivo.suffix.lower()
 
-            if ext not in VIDEO_EXTENSIONS and ext not in IMAGE_EXTENSIONS:
+            if (
+                ext not in VIDEO_EXTENSIONS
+                and ext not in IMAGE_EXTENSIONS
+                and ext not in PDF_EXTENSIONS
+            ):
                 continue
 
             if self.process_file(arquivo):
@@ -162,7 +170,7 @@ class Compressor:
 
         ext = src.suffix.lower()
 
-        if ext == ".png":
+        if ext in {".png", ".heic", ".heif"}:
             dest = dest.with_suffix(".jpg")
 
         log_path = src if self.in_place else dest
@@ -173,38 +181,84 @@ class Compressor:
 
         dest.parent.mkdir(parents=True, exist_ok=True)
 
-        if ext == ".png":
-            return self.convert_png(src, dest)
+        if ext in {".png", ".heic", ".heif"}:
+            return self.convert_image(src, dest)
+
+        if ext in PDF_EXTENSIONS:
+            return self.compress_pdf(src, dest)
 
         if self.in_place:
             return self.compress_in_place(src)
 
         return self.compress_copy(src, dest)
+    
+    def compress_pdf(self, src, dest):
 
-    def convert_png(self, src, dest):
+        print(f"📄 Comprimindo PDF: {src.relative_to(self.origem)}")
 
-        print(f"🖼️ Convertendo PNG -> JPG: {src.relative_to(self.origem)}")
+        tmp = dest.with_suffix(".tmp.pdf")
 
         cmd = [
-            "ffmpeg",
-            "-i",
+            "gs",
+            "-sDEVICE=pdfwrite",
+            "-dCompatibilityLevel=1.4",
+            "-dPDFSETTINGS=/ebook",
+            "-dNOPAUSE",
+            "-dQUIET",
+            "-dBATCH",
+            f"-sOutputFile={tmp}",
             str(src),
-            "-q:v",
-            "4",
-            "-y",
-            str(dest),
         ]
 
-        ok = run_ffmpeg(cmd, self.verbose)
+        ok = run_command(cmd, self.verbose)
 
-        if not ok:
+        if not ok or not tmp.exists():
+            print(f"❌ Falha: {src}")
+            tmp.unlink(missing_ok=True)
+            return False
+
+        tmp.replace(dest)
+
+        self.save_log(dest)
+
+        print("✅ PDF comprimido.")
+
+        return True
+
+    def convert_image(self, src, dest):
+
+        print(
+            f"🖼️ Convertendo {src.suffix.upper()} -> JPG: "
+            f"{src.relative_to(self.origem)}"
+        )
+
+        if src.suffix.lower() in {".heic", ".heif"}:
+            cmd = [
+                "heif-convert",
+                str(src),
+                str(dest),
+            ]
+        else:
+            cmd = [
+                "ffmpeg",
+                "-i",
+                str(src),
+                "-q:v",
+                "4",
+                "-y",
+                str(dest),
+            ]
+
+        ok = run_command(cmd, self.verbose)
+
+        if not ok or not dest.exists():
             print(f"❌ Falha: {src}")
             return False
 
         if self.in_place:
             src.unlink()
 
-        self.save_log(dest if not self.in_place else dest)
+        self.save_log(dest)
 
         print("✅ Convertido.")
 
@@ -252,7 +306,7 @@ class Compressor:
                 str(tmp),
             ]
 
-        ok = run_ffmpeg(cmd, self.verbose)
+        ok = run_command(cmd, self.verbose)
 
         if not ok or not tmp.exists():
             print(f"❌ Falha: {src}")
@@ -310,7 +364,7 @@ class Compressor:
                 str(tmp),
             ]
 
-        ok = run_ffmpeg(cmd, self.verbose)
+        ok = run_command(cmd, self.verbose)
 
         if not ok or not tmp.exists():
             print(f"❌ Falha: {src}")
@@ -323,7 +377,7 @@ class Compressor:
         print("✅ Comprimido.")
 
         return True
-
+    
 
 # --------------------------------------------------------
 # Main
@@ -350,7 +404,7 @@ def main():
 
     args = parser.parse_args()
 
-    check_ffmpeg()
+    check_dependencies()
 
     origem = Path(args.origem)
 
