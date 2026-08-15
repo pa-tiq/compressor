@@ -75,7 +75,7 @@ def process_drive(
 
             try:
                 drive.download(
-                    file_id,
+                    file,
                     source,
                 )
 

@@ -69,9 +69,11 @@ class GoogleDrive:
                     q=query,
                     spaces="drive",
                     corpora="user",
+                    includeItemsFromAllDrives=True,
+                    supportsAllDrives=True,
                     fields=(
                         "nextPageToken,"
-                        "files(id,name,mimeType,size)"
+                        "files(id,name,mimeType,size,resourceKey)"
                     ),
                     pageSize=1000,
                     pageToken=page_token,
@@ -87,31 +89,34 @@ class GoogleDrive:
             if not page_token:
                 break
 
-    def download(self, file_id, destination):
+    def download(self, file, destination):
         """Baixa um arquivo do Drive."""
-        request = self.service.files().get(
-            fileId=file_id,
-            alt="media",
+
+        file_id = file["id"]
+        resource_key = file.get("resourceKey")
+
+        # Construir a URL de download diretamente
+        url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media&supportsAllDrives=True"
+        
+        # Criar o request HTTP
+        headers = {}
+        if resource_key:
+            headers["X-Goog-Drive-Resource-Keys"] = f"{file_id}/{resource_key}"
+        
+        # Usar o http object do serviço para fazer o request
+        response, content = self.service._http.request(
+            uri=url,
+            method="GET",
+            headers=headers
         )
-
+        
+        if response.status != 200:
+            raise Exception(f"Erro no download: {response.status} - {content.decode('utf-8')}")
+        
         with open(destination, "wb") as f:
-
-            downloader = MediaIoBaseDownload(
-                f,
-                request,
-            )
-
-            done = False
-
-            while not done:
-
-                status, done = downloader.next_chunk()
-
-                if status:
-                    print(
-                        f"☁️ Download: "
-                        f"{status.progress() * 100:.1f}%"
-                    )
+            f.write(content)
+        
+        print("☁️ Download: 100.0%")
 
     def update_file(
         self,
@@ -137,6 +142,7 @@ class GoogleDrive:
                 fileId=file_id,
                 body=metadata,
                 media_body=media,
+                supportsAllDrives=True,
                 fields="id,name,size",
             )
             .execute()

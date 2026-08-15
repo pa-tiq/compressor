@@ -69,7 +69,7 @@ python3 compress.py origem destino
 
 python3 compress.py --in-place --verbose origem
 
-python3 compress.py /home/usuario/projetos/compressor/Backup /home/usuario/projetos/compressor/Comprimidos
+python3 compress.py -i -v /home/usuario/projetos/compressor/Backup /home/usuario/projetos/compressor/Comprimidos
 
 ```
 
@@ -83,10 +83,10 @@ Para PNG, HEIC e HEIF, a conversão para JPG também altera o nome/extensão do 
 
 O processamento do Google Drive deve ser direcionado para uma pasta específica através do --drive-folder-id.
 
-Por exemplo: Em `https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOpQrStUvWxYz`, o ID da pasta é `1AbCdEfGhIjKlMnOpQrStUvWxYz`.
+Por exemplo: Em `https://drive.google.com/drive/folders/19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z`, o ID da pasta é `19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z`.
 
 ```bash
-python3 compress.py --drive --drive-folder-id "1AbCdEfGhIjKlMnOpQrStUvWxYz"
+python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z"
 ```
 
 O programa lista os arquivos da pasta, baixa cada arquivo temporariamente para o pc, comprime localmente, compara o tamanho original com o tamanho comprimido, envia de volta para o Google Drive se ele ficar menor e remove os arquivos temporários após o processamento.
@@ -94,7 +94,7 @@ O programa lista os arquivos da pasta, baixa cada arquivo temporariamente para o
 Se quiser remover permanentemente as revisões anteriores dos arquivos atualizados, use o seguinte comando:
 
 ```bash
-python3 compress.py --drive --drive-folder-id "1AbCdEfGhIjKlMnOpQrStUvWxYz" --drive-delete-revisions
+python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z" --drive-delete-revisions
 ```
 
 Depois disso, o conteúdo anterior não poderá ser recuperado pelo histórico de versões.
