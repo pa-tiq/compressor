@@ -213,7 +213,7 @@ def process_drive(
                 # (já que as revisões foram deletadas na fase prévia)
                 try:
                     drive.set_app_property(file_id, "compressor_script", "1")
-                    print("✅ Arquivo marcado como processado (appProperties).")
+                    print("⏭️ Arquivo marcado como processado (appProperties).")
                 except Exception as e:
                     print(f"⚠️ Não foi possível marcar arquivo como processado: {e}")
                 
