@@ -133,10 +133,18 @@ python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z
 
 O programa lista os arquivos da pasta, baixa cada arquivo temporariamente para o pc, comprime localmente, compara o tamanho original com o tamanho comprimido, envia de volta para o Google Drive se ele ficar menor e remove os arquivos temporários após o processamento.
 
-Se quiser remover permanentemente as revisões anteriores dos arquivos atualizados, use o seguinte comando:
+Para evitar compressão repetida, o programa ignora arquivos marcados como já comprimidos em `.drive_logs` e também marca arquivos já comprimidos no `appProperties` do Google Drive.
+
+O sistema de cache funciona em dois níveis:
+- **Logger local (`.drive_logs/`)**: Permite retomar processamentos interrompidos
+- **appProperties do Drive**: Marca permanentemente arquivos já processados no próprio Google Drive
+
+Arquivos marcados com `appProperties` são completamente pulados em execuções subsequentes, pois já foram processados anteriormente e tiveram suas revisões deletadas (se `--drive-delete-revisions` foi usado).
+
+Se quiser remover permanentemente as revisões anteriores dos arquivos processados, use o seguinte comando:
 
 ```bash
 python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z" --drive-delete-revisions
 ```
 
-Depois disso, o conteúdo anterior não poderá ser recuperado pelo histórico de versões.
+O `--drive-delete-revisions` deleta as revisões anteriores dos arquivos que forem processados. Arquivos já marcados no `appProperties` são completamente pulados (inclusive a deleção de revisões), pois já tiveram suas revisões deletadas em execuções anteriores. Depois disso, o conteúdo anterior não poderá ser recuperado pelo histórico de versões.

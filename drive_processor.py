@@ -47,8 +47,32 @@ def process_drive(
     # Iniciar sessão de logging
     logger.start_session(folder_id, len(supported))
     
-    # Filtrar apenas arquivos não processados
-    remaining_files = logger.get_remaining_files(supported)
+    # Primeiro, filtrar arquivos que já têm appProperties (já foram processados anteriormente)
+    files_with_app_properties = []
+    files_without_app_properties = []
+    
+    for file in supported:
+        if drive.has_app_property(file, "compressor_script"):
+            files_with_app_properties.append(file)
+        else:
+            files_without_app_properties.append(file)
+    
+    if files_with_app_properties:
+        print(f"📝 {len(files_with_app_properties)} arquivo(s) já marcado(s) no Drive (appProperties) - completamente pulado(s).")
+    
+    # Se --drive-delete-revisions está ativo, deletar revisões apenas dos arquivos não marcados
+    if delete_revisions and files_without_app_properties:
+        print(f"🗑️ Deletando revisões antigas dos {len(files_without_app_properties)} arquivo(s) não marcado(s)...")
+        deleted_total = 0
+        for file in files_without_app_properties:
+            file_id = file["id"]
+            deleted = drive.delete_old_revisions(file_id)
+            deleted_total += deleted
+        print(f"✅ {deleted_total} revisão(ões) removida(s) no total.")
+        print("💡 Arquivos marcados no Drive já tiveram suas revisões deletadas anteriormente.")
+    
+    # Filtrar apenas arquivos não processados (usando apenas os sem appProperties)
+    remaining_files = logger.get_remaining_files(files_without_app_properties)
     
     # Verificar também appProperties para arquivos que não estão no logger
     truly_remaining = []
@@ -63,8 +87,27 @@ def process_drive(
             logger.mark_file_skipped(file_id, "Já comprimido pelo script (appProperties)")
             app_properties_skipped += 1
     
+    # Marcar arquivos que estão no logger como completed com appProperties
+    # Isso garante consistência entre o logger local e o Drive
+    logger_skipped_files = []
+    for file in files_without_app_properties:
+        file_id = file["id"]
+        file_name = file["name"]
+        # Verificar se está no logger como completed ou skipped
+        if logger.is_file_processed(file_id, file_name):
+            if not drive.has_app_property(file, "compressor_script"):
+                # Marcar com appProperties para consistência
+                try:
+                    drive.set_app_property(file_id, "compressor_script", "1")
+                    logger_skipped_files.append(file_name)
+                except Exception as e:
+                    print(f"⚠️ Não foi possível marcar {file_name} no Drive: {e}")
+    
     if app_properties_skipped > 0:
         print(f"📝 {app_properties_skipped} arquivo(s) pulado(s) pelo appProperties do Drive.")
+    
+    if logger_skipped_files:
+        print(f"📝 {len(logger_skipped_files)} arquivo(s) do logger marcado(s) com appProperties para consistência.")
     
     remaining_files = truly_remaining
     
@@ -87,7 +130,7 @@ def process_drive(
                 f"[{index}/{len(remaining_files)}] "
                 f"📄 {name}"
             )
-            print("⏭️ Arquivo já marcado como comprimido pelo script (appProperties). Pulando.")
+            print("⏭️ Arquivo já marcado como comprimido pelo script (appProperties). Pulando completamente.")
             logger.mark_file_skipped(file_id, "Já comprimido pelo script (appProperties)")
             continue
 
@@ -173,12 +216,6 @@ def process_drive(
                 except Exception as e:
                     print(f"⚠️ Não foi possível marcar arquivo como processado: {e}")
                 
-                # Deletar revisões antigas mesmo se arquivo não ficou menor
-                if delete_revisions:
-                    print("🗑️ Removendo revisões antigas...")
-                    deleted = drive.delete_old_revisions(file_id)
-                    print(f"✅ {deleted} revisão(ões) removida(s).")
-                
                 continue
 
             reduction = (
@@ -218,20 +255,14 @@ def process_drive(
 
             print("✅ Arquivo atualizado.")
 
-            # Marcar arquivo como concluído
+            # Marcar arquivo como concluído no logger
             logger.mark_file_completed(file_id, original_size, compressed_size, reduction)
-
-            if delete_revisions:
-
-                print("🗑️ Removendo revisões antigas...")
-
-                deleted = drive.delete_old_revisions(
-                    file_id,
-                )
-
-                print(
-                    f"✅ {deleted} revisão(ões) removida(s)."
-                )
+            
+            # Sempre marcar com appProperties, independente do logger
+            try:
+                drive.set_app_property(file_id, "compressor_script", "1")
+            except Exception as e:
+                print(f"⚠️ Não foi possível marcar arquivo como processado no Drive: {e}")
 
         print()
     

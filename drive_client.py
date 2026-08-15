@@ -176,6 +176,27 @@ class GoogleDrive:
         """Verifica se um arquivo tem uma propriedade de aplicação específica."""
         app_properties = file.get("appProperties", {})
         return key in app_properties
+    
+    def remove_app_property(self, file_id, key):
+        """Remove uma propriedade de aplicação de um arquivo."""
+        # Primeiro obter as propriedades existentes
+        file = self.service.files().get(
+            fileId=file_id,
+            fields="appProperties",
+            supportsAllDrives=True
+        ).execute()
+        
+        existing_properties = file.get("appProperties", {})
+        if key in existing_properties:
+            del existing_properties[key]
+            
+            # Atualizar apenas as propriedades (sem o conteúdo do arquivo)
+            self.service.files().update(
+                fileId=file_id,
+                body={"appProperties": existing_properties},
+                supportsAllDrives=True,
+                fields="id"
+            ).execute()
 
     def delete_old_revisions(self, file_id):
         """Remove revisões antigas de um arquivo."""
