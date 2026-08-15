@@ -1,8 +1,7 @@
 ## [github.com/pa-tiq/compressor](https://github.com/pa-tiq/compressor)
 
 Utilitário que comprime vídeos, imagens e pdfs.
-Salva o progresso em um log. Então permite cancelar e depois continuar do ponto onde parou.
-`--in-place` substitui o arquivo original pelo arquivo comprimido direto no diretório de origem, _sem backup_. Use com cuidado.
+O programa permite cancelar (Ctrl+C) e depois continuar do ponto onde parou.
 
 ### Estrutura do Projeto
 
