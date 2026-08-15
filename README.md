@@ -136,6 +136,7 @@ O programa lista os arquivos da pasta, baixa cada arquivo temporariamente para o
 Para evitar compressão repetida, o programa ignora arquivos marcados como já comprimidos em `.drive_logs` e também marca arquivos já comprimidos no `appProperties` do Google Drive.
 
 O sistema de cache funciona em dois níveis:
+
 - **Logger local (`.drive_logs/`)**: Permite retomar processamentos interrompidos
 - **appProperties do Drive**: Marca permanentemente arquivos já processados no próprio Google Drive
 
@@ -147,4 +148,11 @@ Se quiser remover permanentemente as revisões anteriores dos arquivos processad
 python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z" --drive-delete-revisions
 ```
 
-O `--drive-delete-revisions` deleta as revisões anteriores dos arquivos que forem processados. Arquivos já marcados no `appProperties` são completamente pulados (inclusive a deleção de revisões), pois já tiveram suas revisões deletadas em execuções anteriores. Depois disso, o conteúdo anterior não poderá ser recuperado pelo histórico de versões.
+O `--drive-delete-revisions` tem precedência absoluta (exceto sobre arquivos marcados no `appProperties`):
+
+- **Deleção prévia**: Deleta revisões antigas de todos os arquivos não marcados antes do processamento
+- **Deleção pós-upload**: Deleta a versão anterior criada pelo upload bem-sucedido
+
+Arquivos já marcados no `appProperties` são completamente pulados, pois já tiveram suas revisões deletadas em execuções anteriores e já estão com tamanho otimizado.
+
+A utilização do `--drive-delete-revisions` implica que o conteúdo anterior do arquivo não poderá ser recuperado pelo histórico de versões.

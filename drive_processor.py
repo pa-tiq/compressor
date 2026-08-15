@@ -61,6 +61,7 @@ def process_drive(
         print(f"📝 {len(files_with_app_properties)} arquivo(s) já marcado(s) no Drive (appProperties) - completamente pulado(s).")
     
     # Se --drive-delete-revisions está ativo, deletar revisões apenas dos arquivos não marcados
+    # Isso garante que todos os arquivos processados tenham revisões limpas
     if delete_revisions and files_without_app_properties:
         print(f"🗑️ Deletando revisões antigas dos {len(files_without_app_properties)} arquivo(s) não marcado(s)...")
         deleted_total = 0
@@ -209,7 +210,8 @@ def process_drive(
                 )
                 logger.mark_file_skipped(file_id, "Arquivo não ficou menor após compressão")
                 
-                # Marcar arquivo como processado mesmo que não tenha ficado menor
+                # Marcar com appProperties mesmo que não tenha ficado menor
+                # (já que as revisões foram deletadas na fase prévia)
                 try:
                     drive.set_app_property(file_id, "compressor_script", "1")
                     print("✅ Arquivo marcado como processado (appProperties).")
@@ -254,6 +256,12 @@ def process_drive(
                 continue
 
             print("✅ Arquivo atualizado.")
+
+            # Deletar revisões antigas se --drive-delete-revisions estiver ativo
+            if delete_revisions:
+                print("🗑️ Removendo revisões antigas...")
+                deleted = drive.delete_old_revisions(file_id)
+                print(f"✅ {deleted} revisão(ões) removida(s).")
 
             # Marcar arquivo como concluído no logger
             logger.mark_file_completed(file_id, original_size, compressed_size, reduction)
