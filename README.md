@@ -123,6 +123,7 @@ Para PNG, HEIC e HEIF, a conversão para JPG também altera o nome/extensão do 
 2. Google Drive API -> Gerenciar -> Credenciais -> Criar credenciais -> opção "ID do cliente OAuth" -> tipo "App para computador".
 3. Salve o arquivo JSON como `credentials.json` na pasta desse repositório.
 4. Talvez você precise adicionar o seu e-mail em [Público-alvo](https://console.cloud.google.com/auth/audience) -> Usuários de teste.
+5. Na primeira vez que vc rodar o script no terminal, o Google vai pedir pra vc clicar em um link e concluir o seu login no navegador. É possível que no navegador apareça um aviso de segurança, nesse caso será necessário ir para opções avançadas e seguir com o login. Quando finalizar, será criado um arquivo `token.json` na pasta raiz do projeto. Esse arquivo já está no gitignore. Só quando esse arquivo for criado é que a sua autenticação no Google Drive estará funcional.
 
 O processamento do Google Drive deve ser direcionado para uma pasta específica através do `--drive-folder-id`.
 
