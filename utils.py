@@ -61,7 +61,7 @@ def detect_video_codec():
         for codec in ("hevc_nvenc", "h264_nvenc"):
             if codec in encoders and _nvenc_funciona(codec):
                 print(f"🚀 GPU NVIDIA detectada. Usando {codec} (NVENC).")
-                return codec, "28", "p5", True
+                return codec, "32", "p5", True
 
         print(
             "⚠️ GPU NVIDIA encontrada, mas o NVENC não respondeu "
