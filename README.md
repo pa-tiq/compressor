@@ -100,7 +100,7 @@ Uso rápido (comprime direto na pasta, substituindo os arquivos originais)
 python3 compress.py -i /home/usuario/projetos/compressor/Backup
 ```
 
-O `--in-place` serve para comprimir arquivos substituindo os originais. Sem esse modo, origem e destino são obrigatórios.
+O `-i`/`--in-place` serve para comprimir arquivos substituindo os originais. Sem esse modo, origem e destino são obrigatórios. O `-v`/`--verbose` serve para mostrar os logs de compressão.
 
 Exemplos:
 
