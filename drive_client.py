@@ -10,39 +10,39 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from config import DRIVE_SCOPES
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 
 def authenticate_drive():
     """Autentica com o Google Drive e retorna o serviço."""
     creds = None
 
-    if os.path.exists("token.json"):
-        creds = Credentials.from_authorized_user_file(
-            "token.json",
-            DRIVE_SCOPES,
-        )
+    try:
+        if os.path.exists("token.json"):
+            creds = Credentials.from_authorized_user_file("token.json", DRIVE_SCOPES)
 
-    if not creds or not creds.valid:
+        if not creds or not creds.valid:
+            if creds and creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+            else:
+                flow = InstalledAppFlow.from_client_secrets_file("credentials.json", DRIVE_SCOPES)
+                creds = flow.run_local_server(port=0, open_browser=False)
 
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            with open("token.json", "w") as token:
+                token.write(creds.to_json())
 
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json",
-                DRIVE_SCOPES,
-            )
+        print("✅ creds.valid:", creds.valid)
+        print("✅ creds.expired:", creds.expired)
+        print("✅ creds.scopes:", creds.scopes)
 
-            creds = flow.run_local_server(port=0)
+    except Exception as e:
+        import traceback
+        print("❌ Erro na autenticação:")
+        traceback.print_exc()
+        raise
 
-        with open("token.json", "w") as token:
-            token.write(creds.to_json())
-
-    return build(
-        "drive",
-        "v3",
-        credentials=creds,
-    )
+    return build("drive", "v3", credentials=creds)
 
 
 class GoogleDrive:
