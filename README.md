@@ -124,7 +124,7 @@ Para PNG, HEIC e HEIF, a conversão para JPG também altera o nome/extensão do 
 3. Salve o arquivo JSON como `credentials.json` na pasta desse repositório.
 4. Talvez você precise adicionar o seu e-mail em [Público-alvo](https://console.cloud.google.com/auth/audience) -> Usuários de teste.
 
-O processamento do Google Drive deve ser direcionado para uma pasta específica através do --drive-folder-id.
+O processamento do Google Drive deve ser direcionado para uma pasta específica através do `--drive-folder-id`.
 
 Por exemplo: Em `https://drive.google.com/drive/folders/19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z`, o ID da pasta é `19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z`.
 
