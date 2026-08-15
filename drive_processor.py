@@ -20,17 +20,25 @@ def process_drive(
     folder_id,
     delete_revisions=False,
 ):    
-    """Processa arquivos do Google Drive."""
+    """Processa arquivos do Google Drive recursivamente."""
     drive = GoogleDrive()
     logger = DriveLogger()
 
     files = list(
-        drive.list_files(folder_id)
+        drive.list_files_recursive(folder_id)
     )
     
+    # Separar arquivos e pastas para estatísticas
+    folders = []
     supported = []
 
     for file in files:
+        mime_type = file.get("mimeType", "")
+        
+        # Contar pastas
+        if mime_type == "application/vnd.google-apps.folder":
+            folders.append(file)
+            continue
 
         name = file["name"]
         ext = Path(name).suffix.lower()
@@ -113,6 +121,7 @@ def process_drive(
     remaining_files = truly_remaining
     
     print()
+    print(f"📁 Pastas encontradas: {len(folders)}")
     print(f"☁️ Arquivos encontrados: {len(supported)}")
     print(f"📝 Arquivos para processar: {len(remaining_files)}")
     print()
@@ -124,16 +133,6 @@ def process_drive(
         original_size = int(file.get("size", 0))
 
         ext = Path(name).suffix.lower()
-
-        # Verificar se o arquivo já foi comprimido pelo script usando appProperties
-        if drive.has_app_property(file, "compressor_script"):
-            print(
-                f"[{index}/{len(remaining_files)}] "
-                f"📄 {name}"
-            )
-            print("⏭️ Arquivo já marcado como comprimido pelo script (appProperties). Pulando completamente.")
-            logger.mark_file_skipped(file_id, "Já comprimido pelo script (appProperties)")
-            continue
 
         print(
             f"[{index}/{len(remaining_files)}] "

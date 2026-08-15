@@ -88,6 +88,51 @@ class GoogleDrive:
 
             if not page_token:
                 break
+    
+    def list_files_recursive(self, folder_id=None):
+        """Lista arquivos de uma pasta do Drive recursivamente (inclui subpastas)."""
+        
+        def list_folder_recursive(current_folder_id):
+            # Listar arquivos e pastas na pasta atual
+            page_token = None
+            query = f"trashed = false and '{current_folder_id}' in parents"
+            
+            while True:
+                response = (
+                    self.service.files()
+                    .list(
+                        q=query,
+                        spaces="drive",
+                        corpora="user",
+                        includeItemsFromAllDrives=True,
+                        supportsAllDrives=True,
+                        fields=(
+                            "nextPageToken,"
+                            "files(id,name,mimeType,size,resourceKey,appProperties)"
+                        ),
+                        pageSize=1000,
+                        pageToken=page_token,
+                    )
+                    .execute()
+                )
+
+                for file in response.get("files", []):
+                    yield file
+                    
+                    # Se for uma pasta, processar recursivamente
+                    if file.get("mimeType") == "application/vnd.google-apps.folder":
+                        yield from list_folder_recursive(file["id"])
+
+                page_token = response.get("nextPageToken")
+
+                if not page_token:
+                    break
+        
+        if folder_id:
+            yield from list_folder_recursive(folder_id)
+        else:
+            # Se não tiver folder_id, listar todos os arquivos (não recursivo)
+            yield from self.list_files()
 
     def download(self, file, destination):
         """Baixa um arquivo do Drive."""
