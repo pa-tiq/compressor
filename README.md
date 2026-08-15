@@ -52,6 +52,47 @@ heif-convert --version
 ghostscript -version
 ```
 
+## Aceleração por GPU NVIDIA (NVENC)
+
+Se você tiver uma placa NVIDIA disponível, o script detecta e usa automaticamente o encoder por GPU (NVENC) na compressão de **vídeos**, que é a parte mais lenta do processo. Não precisa passar nenhuma flag extra: se a GPU e o driver responderem corretamente, o `hevc_nvenc` (ou `h264_nvenc`, como alternativa) é usado; caso contrário, o script cai automaticamente para `libx265`/`libx264` via CPU, como antes.
+
+Requisitos:
+
+1. Driver NVIDIA instalado (`nvidia-smi` precisa funcionar):
+
+   ```bash
+   nvidia-smi
+   ```
+
+2. ffmpeg compilado com suporte a NVENC. Verifique com:
+
+   ```bash
+   ffmpeg -encoders | grep nvenc
+   ```
+
+   Se não aparecer nada, o ffmpeg do seu sistema (via `apt`, por exemplo) provavelmente não tem suporte a NVENC. Nesse caso, uma opção é instalar a versão estática oficial, que já vem com NVENC habilitado:
+
+   ```bash
+   wget https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+   tar xf ffmpeg-release-amd64-static.tar.xz
+   sudo cp ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/
+   sudo cp ffmpeg-*-amd64-static/ffprobe /usr/local/bin/
+   ```
+
+3. Drivers de vídeo NVIDIA atualizados o suficiente para o codec desejado (HEVC/NVENC costuma exigir GPUs Pascal ou mais recentes; GPUs mais antigas podem só suportar `h264_nvenc`, que o script já tenta como alternativa).
+
+Ao rodar, se a GPU for detectada e funcional, você verá no início da execução:
+
+```
+🚀 GPU NVIDIA detectada. Usando hevc_nvenc (NVENC).
+```
+
+Se a GPU existir mas o NVENC não responder (driver desatualizado, ffmpeg sem suporte, etc.), o script avisa e volta para CPU automaticamente:
+
+```
+⚠️ GPU NVIDIA encontrada, mas o NVENC não respondeu (driver/ffmpeg sem suporte). Usando CPU.
+```
+
 ## Compressão de arquivos locais
 
 Uso rápido (comprime direto na pasta, substituindo os arquivos originais)
@@ -78,8 +119,9 @@ Para PNG, HEIC e HEIF, a conversão para JPG também altera o nome/extensão do 
 ## Compressão de arquivos do Google Drive
 
 1. No [Google Cloud Console](https://console.cloud.google.com/), ative a [Google Drive API](https://console.cloud.google.com/marketplace/product/google/drive.googleapis.com).
-2. Na seção Credenciais, selecione Criar credenciais e escolha a opção "ID do cliente OAuth", do tipo "App para computador".
+2. Google Drive API -> Gerenciar -> Credenciais -> Criar credenciais -> opção "ID do cliente OAuth" -> tipo "App para computador".
 3. Salve o arquivo JSON como `credentials.json` na pasta desse repositório.
+4. Talvez você precise adicionar o seu e-mail em [Público-alvo](https://console.cloud.google.com/auth/audience) -> Usuários de teste.
 
 O processamento do Google Drive deve ser direcionado para uma pasta específica através do --drive-folder-id.
 
@@ -94,7 +136,7 @@ O programa lista os arquivos da pasta, baixa cada arquivo temporariamente para o
 Se quiser remover permanentemente as revisões anteriores dos arquivos atualizados, use o seguinte comando:
 
 ```bash
-python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z" --drive-delete-revisions
+python3 compress.py --drive --drive-folder-id "1eswIoPOGaEj05Ua_-VaOSh9AivjznK51" --drive-delete-revisions
 ```
 
 Depois disso, o conteúdo anterior não poderá ser recuperado pelo histórico de versões.

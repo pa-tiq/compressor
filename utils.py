@@ -17,19 +17,62 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 
+def _nvenc_funciona(codec):
+    """Tenta codificar um frame de teste para confirmar que a GPU/driver
+    realmente suportam o encoder, e não apenas que o ffmpeg foi compilado
+    com suporte a ele."""
+    cmd = [
+        "ffmpeg",
+        "-loglevel",
+        "error",
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=black:s=256x256:d=1",
+        "-c:v",
+        codec,
+        "-frames:v",
+        "1",
+        "-f",
+        "null",
+        "-",
+    ]
+
+    return subprocess.run(cmd, capture_output=True).returncode == 0
+
+
 def detect_video_codec():
-    """Detecta o codec de vídeo disponível no sistema."""
+    """Detecta o codec de vídeo disponível no sistema.
+
+    Prioriza a GPU NVIDIA (NVENC) quando disponível e funcional; caso
+    contrário, cai para codificação por CPU (libx265/libx264).
+
+    Retorna (codec, qualidade, preset, usa_gpu).
+    """
     result = subprocess.run(
         ["ffmpeg", "-encoders"],
         capture_output=True,
         text=True,
     )
 
-    if "libx265" in result.stdout:
-        return "libx265", "28", "medium"
+    encoders = result.stdout
+
+    if shutil.which("nvidia-smi") is not None:
+        for codec in ("hevc_nvenc", "h264_nvenc"):
+            if codec in encoders and _nvenc_funciona(codec):
+                print(f"🚀 GPU NVIDIA detectada. Usando {codec} (NVENC).")
+                return codec, "28", "p5", True
+
+        print(
+            "⚠️ GPU NVIDIA encontrada, mas o NVENC não respondeu "
+            "(driver/ffmpeg sem suporte). Usando CPU."
+        )
+
+    if "libx265" in encoders:
+        return "libx265", "28", "medium", False
 
     print("⚠️ libx265 não encontrado. Usando H.264.")
-    return "libx264", "23", "medium"
+    return "libx264", "23", "medium", False
 
 
 def check_dependencies():

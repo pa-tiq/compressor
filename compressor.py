@@ -47,7 +47,32 @@ class Compressor:
             self.video_codec,
             self.crf,
             self.preset,
+            self.gpu,
         ) = detect_video_codec()
+
+    def _video_quality_args(self):
+        """Argumentos de qualidade/preset do ffmpeg, adaptados ao encoder.
+
+        NVENC (GPU) não aceita -crf: usa -rc vbr + -cq. O preset também
+        usa a nomenclatura p1 (mais rápido) a p7 (melhor qualidade) em
+        vez de ultrafast..veryslow usados pelos encoders de CPU.
+        """
+        if self.gpu:
+            return [
+                "-rc:v",
+                "vbr",
+                "-cq",
+                self.crf,
+                "-preset",
+                self.preset,
+            ]
+
+        return [
+            "-crf",
+            self.crf,
+            "-preset",
+            self.preset,
+        ]
 
     def compress_single(self, src: Path, dest: Path):
         """Comprime um único arquivo."""
@@ -95,10 +120,7 @@ class Compressor:
                 str(src),
                 "-c:v",
                 self.video_codec,
-                "-crf",
-                self.crf,
-                "-preset",
-                self.preset,
+                *self._video_quality_args(),
                 "-c:a",
                 "aac",
                 "-b:a",
@@ -283,10 +305,7 @@ class Compressor:
                 str(src),
                 "-c:v",
                 self.video_codec,
-                "-crf",
-                self.crf,
-                "-preset",
-                self.preset,
+                *self._video_quality_args(),
                 "-c:a",
                 "aac",
                 "-b:a",
@@ -341,10 +360,7 @@ class Compressor:
                 str(dest),
                 "-c:v",
                 self.video_codec,
-                "-crf",
-                self.crf,
-                "-preset",
-                self.preset,
+                *self._video_quality_args(),
                 "-c:a",
                 "aac",
                 "-b:a",
