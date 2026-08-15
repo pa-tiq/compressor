@@ -109,7 +109,9 @@ python3 compress.py origem destino
 
 python3 compress.py --in-place --verbose origem
 
-python3 compress.py -i -v /home/usuario/projetos/compressor/Backup /home/usuario/projetos/compressor/Comprimidos
+python3 compress.py -i -v /home/usuario/projetos/compressor/videos
+
+python3 compress.py -v /home/usuario/projetos/compressor/Backup /home/usuario/projetos/compressor/Comprimidos
 
 ```
 
