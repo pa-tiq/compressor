@@ -11,7 +11,7 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from config import DRIVE_SCOPES
 import logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 
 
 def authenticate_drive():
