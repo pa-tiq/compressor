@@ -10,10 +10,10 @@ from compressor import Compressor
 from utils import check_dependencies
 
 # Importar módulos do Google Drive apenas quando necessário
-process_drive = None
+process_drive_tree = None
 DRIVE_AVAILABLE = False
 try:
-    from drive_processor import process_drive
+    from drive_processor import process_drive_tree
     DRIVE_AVAILABLE = True
 except ImportError:
     pass
@@ -56,11 +56,19 @@ def main():
         help="ID da pasta do Google Drive a processar",
     )
 
+    parser.add_argument(
+        "--drive-workers",
+        type=int,
+        default=None,
+        help="Quantidade máxima de pastas processadas simultaneamente",
+    )
+
     parser.add_argument("origem", nargs="?", help="Diretório de origem")
 
     parser.add_argument("destino", nargs="?", help="Diretório de destino")
 
     args = parser.parse_args()
+    drive_workers = args.drive_workers if args.drive_workers is not None else 4
 
     # Validações de argumentos
     if args.drive:
@@ -79,25 +87,26 @@ def main():
             print("❌ No modo --drive, não especifique origem ou destino.")
             sys.exit(1)
 
-        if not DRIVE_AVAILABLE or process_drive is None:
+        if drive_workers < 1:
+            print("❌ --drive-workers deve ser maior ou igual a 1.")
+            sys.exit(1)
+
+        if not DRIVE_AVAILABLE or process_drive_tree is None:
             print("❌ Módulos do Google Drive não disponíveis.")
             print("Instale as dependências: pip install -r requirements.txt")
             sys.exit(1)
 
         check_dependencies()
 
-        compressor = Compressor(
-            origem=Path("."),
-            destino=Path("."),
-            in_place=False,
+        result = process_drive_tree(
+            root_folder_id=args.drive_folder_id,
+            delete_revisions=args.drive_delete_revisions,
             verbose=args.verbose,
+            workers=drive_workers,
         )
 
-        process_drive(
-            compressor,
-            folder_id=args.drive_folder_id,
-            delete_revisions=args.drive_delete_revisions,
-        )
+        if result["failed"]:
+            sys.exit(1)
 
         return
     
@@ -109,6 +118,10 @@ def main():
     
     if args.drive_delete_revisions:
         print("❌ --drive-delete-revisions só pode ser usado no modo --drive.")
+        sys.exit(1)
+
+    if args.drive_workers is not None:
+        print("❌ --drive-workers só pode ser usado no modo --drive.")
         sys.exit(1)
     
     # Validações para --in-place

@@ -1,278 +1,213 @@
 #!/usr/bin/env python3
 
-"""Processador de arquivos do Google Drive."""
+"""Processamento paralelo de arquivos do Google Drive por pasta."""
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import tempfile
 from pathlib import Path
 
-from config import (
-    DRIVE_MIME_TYPES,
-    IMAGE_EXTENSIONS,
-    PDF_EXTENSIONS,
-    VIDEO_EXTENSIONS,
-)
+from compressor import Compressor
+from config import DRIVE_MIME_TYPES, IMAGE_EXTENSIONS, PDF_EXTENSIONS, VIDEO_EXTENSIONS
 from drive_client import GoogleDrive
 from drive_logger import DriveLogger
 
 
-def process_drive(
-    compressor,
-    folder_id,
-    delete_revisions=False,
-):    
-    """Processa arquivos do Google Drive recursivamente."""
+FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+
+
+def folder_log(folder_label, message):
+    """Imprime uma mensagem identificada pela pasta processada."""
+    print(f"[PASTA: {folder_label}] {message}")
+
+
+def process_drive_folder(compressor, folder_id, delete_revisions=False, folder_label=None):
+    """Processa exclusivamente os arquivos diretamente pertencentes a uma pasta."""
     drive = GoogleDrive()
     logger = DriveLogger()
+    label = folder_label or folder_id
+    files = list(drive.list_files(folder_id))
+    supported = [
+        file for file in files
+        if file.get("mimeType") != FOLDER_MIME_TYPE
+        and Path(file["name"]).suffix.lower()
+        in (VIDEO_EXTENSIONS | IMAGE_EXTENSIONS | PDF_EXTENSIONS)
+    ]
 
-    files = list(
-        drive.list_files_recursive(folder_id)
-    )
-    
-    # Separar arquivos e pastas para estatísticas
-    folders = []
-    supported = []
-
-    for file in files:
-        mime_type = file.get("mimeType", "")
-        
-        # Contar pastas
-        if mime_type == "application/vnd.google-apps.folder":
-            folders.append(file)
-            continue
-
-        name = file["name"]
-        ext = Path(name).suffix.lower()
-
-        if ext in VIDEO_EXTENSIONS:
-            supported.append(file)
-
-        elif ext in IMAGE_EXTENSIONS:
-            supported.append(file)
-
-        elif ext in PDF_EXTENSIONS:
-            supported.append(file)
-
-    # Iniciar sessão de logging
     logger.start_session(folder_id, len(supported))
-    
-    # Primeiro, filtrar arquivos que já têm appProperties (já foram processados anteriormente)
-    files_with_app_properties = []
-    files_without_app_properties = []
-    
-    for file in supported:
-        if drive.has_app_property(file, "compressor_script"):
-            files_with_app_properties.append(file)
-        else:
-            files_without_app_properties.append(file)
-    
+    files_with_app_properties = [
+        file for file in supported
+        if drive.has_app_property(file, "compressor_script")
+    ]
+    files_without_app_properties = [
+        file for file in supported
+        if not drive.has_app_property(file, "compressor_script")
+    ]
+
     if files_with_app_properties:
-        print(f"📝 {len(files_with_app_properties)} arquivo(s) já marcado(s) no Drive (appProperties) - completamente pulado(s).")
-    
-    # Se --drive-delete-revisions está ativo, deletar revisões apenas dos arquivos não marcados
-    # Isso garante que todos os arquivos processados tenham revisões limpas
+        folder_log(label, f"{len(files_with_app_properties)} arquivo(s) já marcado(s) no Drive - pulado(s).")
+
     if delete_revisions and files_without_app_properties:
-        print(f"🗑️ Deletando revisões antigas dos {len(files_without_app_properties)} arquivo(s) não marcado(s)...")
-        deleted_total = 0
-        for file in files_without_app_properties:
-            file_id = file["id"]
-            deleted = drive.delete_old_revisions(file_id)
-            deleted_total += deleted
-        print(f"✅ {deleted_total} revisão(ões) removida(s) no total.")
-        print("💡 Arquivos marcados no Drive já tiveram suas revisões deletadas anteriormente.")
-    
-    # Filtrar apenas arquivos não processados (usando apenas os sem appProperties)
+        folder_log(label, f"Deletando revisões antigas de {len(files_without_app_properties)} arquivo(s)...")
+        deleted_total = sum(
+            drive.delete_old_revisions(file["id"])
+            for file in files_without_app_properties
+        )
+        folder_log(label, f"{deleted_total} revisão(ões) removida(s) no total.")
+
     remaining_files = logger.get_remaining_files(files_without_app_properties)
-    
-    # Verificar também appProperties para arquivos que não estão no logger
     truly_remaining = []
     app_properties_skipped = 0
     for file in remaining_files:
         if not drive.has_app_property(file, "compressor_script"):
             truly_remaining.append(file)
         else:
-            # Se tem appProperties mas não está no logger, adicionar ao logger como skip
-            file_id = file["id"]
-            file_name = file["name"]
-            logger.mark_file_skipped(file_id, "Já comprimido pelo script (appProperties)")
+            logger.mark_file_skipped(file["id"], "Já comprimido pelo script (appProperties)")
             app_properties_skipped += 1
-    
-    # Marcar arquivos que estão no logger como completed com appProperties
-    # Isso garante consistência entre o logger local e o Drive
+
     logger_skipped_files = []
     for file in files_without_app_properties:
         file_id = file["id"]
-        file_name = file["name"]
-        # Verificar se está no logger como completed ou skipped
-        if logger.is_file_processed(file_id, file_name):
+        if logger.is_file_processed(file_id, file["name"]):
             if not drive.has_app_property(file, "compressor_script"):
-                # Marcar com appProperties para consistência
                 try:
                     drive.set_app_property(file_id, "compressor_script", "1")
-                    logger_skipped_files.append(file_name)
-                except Exception as e:
-                    print(f"⚠️ Não foi possível marcar {file_name} no Drive: {e}")
-    
-    if app_properties_skipped > 0:
-        print(f"📝 {app_properties_skipped} arquivo(s) pulado(s) pelo appProperties do Drive.")
-    
+                    logger_skipped_files.append(file["name"])
+                except Exception as error:
+                    folder_log(label, f"Não foi possível marcar {file['name']} no Drive: {error}")
+
+    if app_properties_skipped:
+        folder_log(label, f"{app_properties_skipped} arquivo(s) pulado(s) pelo appProperties do Drive.")
     if logger_skipped_files:
-        print(f"📝 {len(logger_skipped_files)} arquivo(s) do logger marcado(s) com appProperties para consistência.")
-    
+        folder_log(label, f"{len(logger_skipped_files)} arquivo(s) do logger marcado(s) com appProperties.")
+
     remaining_files = truly_remaining
-    
-    print()
-    print(f"📁 Pastas encontradas: {len(folders)}")
-    print(f"☁️ Arquivos encontrados: {len(supported)}")
-    print(f"📝 Arquivos para processar: {len(remaining_files)}")
-    print()
+    folder_log(label, f"Arquivos válidos: {len(supported)}; para processar: {len(remaining_files)}")
 
     for index, file in enumerate(remaining_files, start=1):
-
         file_id = file["id"]
         name = file["name"]
         original_size = int(file.get("size", 0))
-
         ext = Path(name).suffix.lower()
-
-        print(
-            f"[{index}/{len(remaining_files)}] "
-            f"📄 {name}"
-        )
-
-        # Marcar arquivo como em processamento
+        folder_log(label, f"[{index}/{len(remaining_files)}] Processando {name}")
         logger.mark_file_in_progress(file_id, name)
 
         with tempfile.TemporaryDirectory() as temp_dir:
-
             temp_dir = Path(temp_dir)
-
             source = temp_dir / name
-
-            # HEIC/HEIF/PNG viram JPG.
-            if ext in {".png", ".heic", ".heif"}:
-                output = source.with_suffix(".jpg")
-
-            else:
-                output = source
-
-            print("⬇️ Baixando...")
-
+            output = source.with_suffix(".jpg") if ext in {".png", ".heic", ".heif"} else source
+            folder_log(label, f"Baixando {name}...")
             try:
-                drive.download(
-                    file,
-                    source,
-                )
-
-            except Exception as e:
-
-                print(f"❌ Falha no download: {e}")
-                logger.mark_file_failed(file_id, e)
+                drive.download(file, source)
+            except Exception as error:
+                folder_log(label, f"Falha no download: {error}")
+                logger.mark_file_failed(file_id, error)
                 continue
 
-            compressed = temp_dir / (
-                f"compressed{output.suffix}"
-            )
-
-            if output == source:
-                compressed = (
-                    temp_dir
-                    / f"compressed{source.suffix}"
-                )
-
-            print("🗜️ Comprimindo...")
-
-            if not compressor.compress_single(
-                source,
-                compressed,
-            ):
-                print("❌ Falha na compressão.")
+            compressed = temp_dir / f"compressed{output.suffix}"
+            folder_log(label, f"Comprimindo {name}...")
+            if not compressor.compress_single(source, compressed):
+                folder_log(label, "Falha na compressão.")
                 logger.mark_file_failed(file_id, "Falha na compressão")
                 continue
 
             compressed_size = compressed.stat().st_size
-
-            print(
-                f"   Original:    "
-                f"{original_size / 1024 / 1024:.2f} MB"
-            )
-
-            print(
-                f"   Comprimido:  "
-                f"{compressed_size / 1024 / 1024:.2f} MB"
-            )
-
+            folder_log(label, f"Original: {original_size / 1024 / 1024:.2f} MB; comprimido: {compressed_size / 1024 / 1024:.2f} MB")
             if compressed_size >= original_size:
-
-                print(
-                    "⏭️ Arquivo comprimido não ficou menor. "
-                    "Upload ignorado."
-                )
+                folder_log(label, "Arquivo comprimido não ficou menor; upload ignorado.")
                 logger.mark_file_skipped(file_id, "Arquivo não ficou menor após compressão")
-                
-                # Marcar com appProperties mesmo que não tenha ficado menor
-                # (já que as revisões foram deletadas na fase prévia)
                 try:
                     drive.set_app_property(file_id, "compressor_script", "1")
-                    print("⏭️ Arquivo marcado como processado (appProperties).")
-                except Exception as e:
-                    print(f"⚠️ Não foi possível marcar arquivo como processado: {e}")
-                
+                except Exception as error:
+                    folder_log(label, f"Não foi possível marcar arquivo como processado: {error}")
                 continue
 
-            reduction = (
-                1 - compressed_size / original_size
-            ) * 100
-
-            print(
-                f"   Redução:     {reduction:.1f}%"
-            )
-
-            new_name = output.name
-
-            mime_type = (
-                DRIVE_MIME_TYPES.get(
-                    output.suffix.lower(),
-                    "application/octet-stream",
-                )
-            )
-
-            print("⬆️ Enviando para o Google Drive...")
-
+            reduction = (1 - compressed_size / original_size) * 100
+            mime_type = DRIVE_MIME_TYPES.get(output.suffix.lower(), "application/octet-stream")
+            folder_log(label, f"Enviando {name} para o Google Drive...")
             try:
-
                 drive.update_file(
                     file_id=file_id,
                     local_path=compressed,
-                    name=new_name,
+                    name=output.name,
                     mime_type=mime_type,
                     app_properties={"compressor_script": "1"},
                 )
-
-            except Exception as e:
-
-                print(f"❌ Falha no upload: {e}")
-                logger.mark_file_failed(file_id, e)
+            except Exception as error:
+                folder_log(label, f"Falha no upload: {error}")
+                logger.mark_file_failed(file_id, error)
                 continue
 
-            print("✅ Arquivo atualizado.")
-
-            # Deletar revisões antigas se --drive-delete-revisions estiver ativo
+            folder_log(label, "Arquivo atualizado.")
             if delete_revisions:
-                print("🗑️ Removendo revisões antigas...")
                 deleted = drive.delete_old_revisions(file_id)
-                print(f"✅ {deleted} revisão(ões) removida(s).")
-
-            # Marcar arquivo como concluído no logger
+                folder_log(label, f"{deleted} revisão(ões) removida(s).")
             logger.mark_file_completed(file_id, original_size, compressed_size, reduction)
-            
-            # Sempre marcar com appProperties, independente do logger
             try:
                 drive.set_app_property(file_id, "compressor_script", "1")
-                print("✅ Arquivo marcado como processado (appProperties)")
-            except Exception as e:
-                print(f"⚠️ Não foi possível marcar arquivo como processado no Drive: {e}")
+            except Exception as error:
+                folder_log(label, f"Não foi possível marcar arquivo como processado: {error}")
 
-        print()
-    
-    # Marcar sessão como concluída
     logger.complete_session()
+    return {
+        "folder_id": folder_id,
+        "folder_name": label,
+        "status": "completed",
+        "supported": len(supported),
+        "remaining": len(remaining_files),
+        "empty": not supported,
+    }
+
+
+def process_drive_folder_worker(folder_info, delete_revisions, verbose):
+    """Worker independente para processar uma pasta em seu próprio processo."""
+    compressor = Compressor(Path("."), Path("."), in_place=False, verbose=verbose)
+    return process_drive_folder(
+        compressor,
+        folder_id=folder_info["id"],
+        delete_revisions=delete_revisions,
+        folder_label=folder_info.get("path") or folder_info["name"],
+    )
+
+
+def process_drive_tree(root_folder_id, delete_revisions=False, verbose=False, workers=4):
+    """Descobre a árvore e processa cada pasta com paralelismo limitado."""
+    if workers < 1:
+        raise ValueError("workers deve ser maior ou igual a 1")
+
+    drive = GoogleDrive()
+    folders = list(drive.list_folders_recursive(root_folder_id))
+    print(f"📁 Pastas encontradas: {len(folders)}")
+    completed = 0
+    empty = 0
+    failed = []
+
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(process_drive_folder_worker, folder, delete_revisions, verbose): folder
+            for folder in folders
+        }
+        for future in as_completed(futures):
+            folder = futures[future]
+            try:
+                result = future.result()
+                completed += 1
+                empty += int(result.get("empty", False))
+            except Exception as error:
+                failed.append((folder.get("path") or folder["name"], error))
+                print(f"❌ Falha na pasta {folder.get('path') or folder['name']}: {error}")
+
+    print("========================================")
+    print("PROCESSAMENTO DO DRIVE CONCLUÍDO")
+    print("========================================")
+    print(f"Pastas encontradas: {len(folders)}")
+    print(f"Pastas concluídas:  {completed}")
+    print(f"Pastas sem arquivos: {empty}")
+    print(f"Pastas com falha:   {len(failed)}")
+    print(f"Workers utilizados: {workers}")
+    print("========================================")
+    return {"found": len(folders), "completed": completed, "failed": failed, "empty": empty}
+
+
+def process_drive(compressor, folder_id, delete_revisions=False):
+    """Mantém compatibilidade com chamadas antigas de uma única pasta."""
+    return process_drive_folder(compressor, folder_id, delete_revisions)

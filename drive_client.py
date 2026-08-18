@@ -134,6 +134,38 @@ class GoogleDrive:
             # Se não tiver folder_id, listar todos os arquivos (não recursivo)
             yield from self.list_files()
 
+    def list_folders_recursive(self, folder_id):
+        """Lista a pasta raiz e todas as subpastas descendentes."""
+        root = (
+            self.service.files()
+            .get(
+                fileId=folder_id,
+                fields="id,name,mimeType",
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
+
+        visited = set()
+
+        def visit(folder, path):
+            if folder["id"] in visited:
+                return
+            visited.add(folder["id"])
+
+            yield {
+                "id": folder["id"],
+                "name": folder["name"],
+                "path": path,
+            }
+
+            for item in self.list_files(folder["id"]):
+                if item.get("mimeType") != "application/vnd.google-apps.folder":
+                    continue
+                yield from visit(item, f"{path}/{item['name']}")
+
+        yield from visit(root, root["name"])
+
     def download(self, file, destination):
         """Baixa um arquivo do Drive."""
 
