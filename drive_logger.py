@@ -11,9 +11,10 @@ from pathlib import Path
 class DriveLogger:
     """Gerencia logs de compressão do Drive para permitir retomar processamento."""
 
-    def __init__(self, log_dir=".drive_logs"):
+    def __init__(self, log_dir=".drive_logs", output=print):
         """Inicializa o logger de Drive."""
         self.log_dir = Path(log_dir)
+        self.output = output
         self.log_dir.mkdir(exist_ok=True)
         self.current_log = None
         self.current_folder_id = None
@@ -66,7 +67,7 @@ class DriveLogger:
             self.current_log["failed_files"] = 0
             self.current_log["skipped_files"] = 0
             self.current_log["files"] = {}
-            print(f"📝 Iniciando nova sessão de compressão para pasta {folder_id}")
+            self.output(f"📝 Iniciando nova sessão de compressão para pasta {folder_id}")
         else:
             # Retomar sessão existente (mesmo que tenha sido concluída)
             # Atualizar total de arquivos se mudou
@@ -74,10 +75,10 @@ class DriveLogger:
             # Marcar como não concluído para permitir reprocessamento de arquivos não processados
             self.current_log["completed_at"] = None
             
-            print(f"📝 Retomando sessão para pasta {folder_id}")
-            print(f"   Arquivos já processados: {self.current_log['processed_files']}")
-            print(f"   Arquivos já pulados: {self.current_log['skipped_files']}")
-            print(f"   Arquivos com falha: {self.current_log['failed_files']}")
+            self.output(f"📝 Retomando sessão para pasta {folder_id}")
+            self.output(f"   Arquivos já processados: {self.current_log['processed_files']}")
+            self.output(f"   Arquivos já pulados: {self.current_log['skipped_files']}")
+            self.output(f"   Arquivos com falha: {self.current_log['failed_files']}")
         
         self.save_log(self.current_log)
 
@@ -181,11 +182,11 @@ class DriveLogger:
         self.current_log["completed_at"] = datetime.now().isoformat()
         self.save_log(self.current_log)
         
-        print(f"📝 Sessão concluída para pasta {self.current_folder_id}")
-        print(f"   Total de arquivos: {self.current_log['total_files']}")
-        print(f"   Processados com sucesso: {self.current_log['processed_files']}")
-        print(f"   Falhas: {self.current_log['failed_files']}")
-        print(f"   Pulados: {self.current_log['skipped_files']}")
+        self.output(f"📝 Sessão concluída para pasta {self.current_folder_id}")
+        self.output(f"   Total de arquivos: {self.current_log['total_files']}")
+        self.output(f"   Processados com sucesso: {self.current_log['processed_files']}")
+        self.output(f"   Falhas: {self.current_log['failed_files']}")
+        self.output(f"   Pulados: {self.current_log['skipped_files']}")
 
     def get_remaining_files(self, files):
         """Retorna lista de arquivos que ainda não foram processados."""

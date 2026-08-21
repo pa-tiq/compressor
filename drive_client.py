@@ -32,10 +32,6 @@ def authenticate_drive():
             with open("token.json", "w") as token:
                 token.write(creds.to_json())
 
-        print("✅ creds.valid:", creds.valid)
-        print("✅ creds.expired:", creds.expired)
-        print("✅ creds.scopes:", creds.scopes)
-
     except Exception as e:
         import traceback
         print("❌ Erro na autenticação:")
@@ -193,7 +189,6 @@ class GoogleDrive:
         with open(destination, "wb") as f:
             f.write(content)
         
-        print("☁️ Download: 100.0%")
 
     def update_file(
         self,

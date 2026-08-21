@@ -133,6 +133,12 @@ Por exemplo: Em `https://drive.google.com/drive/folders/19Hghzx13WFNfV1Dg5govNvG
 python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z"
 ```
 
+Se quiser remover permanentemente as revisões anteriores dos arquivos processados, use o seguinte comando:
+
+```bash
+python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z" --drive-delete-revisions
+```
+
 O programa descobre recursivamente a pasta raiz e suas subpastas, mas cada unidade de trabalho processa somente os arquivos diretamente pertencentes à sua pasta. Use `--drive-workers N` para limitar a quantidade de pastas processadas simultaneamente (o padrão é 4):
 
 ```bash
@@ -140,12 +146,6 @@ python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z
 ```
 
 Valores maiores não significam necessariamente maior desempenho, pois o limite ideal depende de CPU, GPU, memória, disco, conexão e quota da API do Drive.
-
-Se quiser remover permanentemente as revisões anteriores dos arquivos processados, use o seguinte comando:
-
-```bash
-python3 compress.py --drive --drive-folder-id "19Hghzx13WFNfV1Dg5govNvGzYSjJSF6z" --drive-delete-revisions
-```
 
 O programa lista as pastas recursivamente, baixa cada arquivo diretamente pertencente à pasta temporariamente para o pc, comprime localmente, compara o tamanho original com o tamanho comprimido, envia de volta para o Google Drive se ele ficar menor e remove os arquivos temporários após o processamento.
 

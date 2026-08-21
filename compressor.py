@@ -22,6 +22,7 @@ class Compressor:
         destino: Path,
         in_place: bool,
         verbose: bool,
+        status_callback=print,
     ):
 
         self.origem = origem.resolve()
@@ -48,7 +49,7 @@ class Compressor:
             self.crf,
             self.preset,
             self.gpu,
-        ) = detect_video_codec()
+        ) = detect_video_codec(output=status_callback)
 
     def _video_quality_args(self):
         """Argumentos de qualidade/preset do ffmpeg, adaptados ao encoder.

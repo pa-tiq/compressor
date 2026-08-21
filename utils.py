@@ -41,7 +41,7 @@ def _nvenc_funciona(codec):
     return subprocess.run(cmd, capture_output=True).returncode == 0
 
 
-def detect_video_codec():
+def detect_video_codec(output=print):
     """Detecta o codec de vídeo disponível no sistema.
 
     Prioriza a GPU NVIDIA (NVENC) quando disponível e funcional; caso
@@ -60,10 +60,10 @@ def detect_video_codec():
     if shutil.which("nvidia-smi") is not None:
         for codec in ("hevc_nvenc", "h264_nvenc"):
             if codec in encoders and _nvenc_funciona(codec):
-                print(f"🚀 GPU NVIDIA detectada. Usando {codec} (NVENC).")
+                output(f"🚀 GPU NVIDIA detectada. Usando {codec} (NVENC).")
                 return codec, "32", "p5", True
 
-        print(
+        output(
             "⚠️ GPU NVIDIA encontrada, mas o NVENC não respondeu "
             "(driver/ffmpeg sem suporte). Usando CPU."
         )
@@ -71,7 +71,7 @@ def detect_video_codec():
     if "libx265" in encoders:
         return "libx265", "28", "medium", False
 
-    print("⚠️ libx265 não encontrado. Usando H.264.")
+    output("⚠️ libx265 não encontrado. Usando H.264.")
     return "libx264", "23", "medium", False
 
 
